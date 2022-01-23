@@ -461,3 +461,84 @@
 
 6. "mixin"风格的base class:允许derived classes 继承单一特定能力。
 
+### 50.了解new 和 delete 的合理替换时机
+
+1. overruns （写入点在分配区块尾端后） underruns (写入点在分配区块起点前)
+2. 理由：
+   1. 用来检测运用上的错误（内存泄漏，，超出下标）
+   2. 收集使用上的统计数据
+   3. 强化效能：编译器自带的operator new 主要用于一般目的，如果你会定制的话，它就会快很多。
+      - 增加分配和归还的速度：比如编译器提供的内存管理是线程安全的，而你的程序是单线程的，你就可以优化这以部分。
+      - 降低缺省内存管理带来的空间额外开销
+      - 为了弥补缺省分配器中的非最佳对齐
+      - 为了将相关对象成簇集中：将常用的数据结果放在同一个页当中。
+      - 为了获得非传统的行为：分配和归还共享内存的区块。
+
+### 51.编写new 和delete时需要固守常规
+
+1. 不能放回一个0byte的空间，如果客户申请的是0size 就反回1size。
+2. operator new 应该内含一个无穷循环，并在其中尝试分配内存，如果无法满足内存需求就应该调用new- handler 。它也应该有能力处理0bytes申请。
+3. operator delete 应该收到null 指针时不做任何事。
+
+### 52.写了placement new 也要写placement delete
+
+1. 定义：如果一个operator new 接受的参数除了size_t 之外还有其他的，那么他就是所谓的placement new。
+
+   ```c++
+   class Widget{
+   	static void* operator new(std::size_t size, void* pMemory) throw();
+   }
+   vector<int>* pv = new vector();
+   Widget* pw = new (pv);
+   ```
+
+2. 当你写了一个placement operator new 后也请写一个参数类型一模一样的placement operator delete 。因为在operator new 失败时，他会调用相应版本的operator delete。否在程序会发生内存泄漏。
+
+3. 当你声明了placemnet new 和placement delete。也请声明他们的正常版本，否则会遮盖他们。
+
+### 杂项讨论
+
+### 53.不要轻易忽视编译器的警告
+
+1. 严肃对待编译器发出的警告信息。（不要忽视他们）
+2. 不要过度依赖编译器的报警能力，因为不同的编译器对待事情的态度并不相同。
+
+### 54.让自己熟悉包括TR1在内的标准程序库
+
+1. c++ 98
+
+   1. STL（Standard Template Library,标准模板库）：覆盖容器（vector，string,map），迭代器，算法，函数对象，各种容器适配器.
+   2. Iostreams 
+   3. 国际化支持,multiple active localse(多种语言环境)
+   4. 数值处理
+   5. 异常阶层体系
+   6. c89 标准程序库
+
+2. TR1（Technical Report 1）
+
+   Tr1 自身只是一份规范。
+
+   1. 智能指针
+   2. tr1::function
+   3. tr1::bind
+   4. Hash tables
+   5. 正则表达式
+   6. Tuples（元组）
+   7. tr1::arry
+   8. tr1::mem_fn
+   9. tr1::reference_wrapper
+   10. 随机数
+   11. 数学特殊函数
+   12. c99 兼容扩充
+
+   TR1 组件 template 编程技术
+
+   1. type traits ：条例47
+   2. tr1::result_of ：template 用来 推导函数调用的返回类型
+
+### 55.让自己熟悉Boost
+
+1. 最后一个条例拉。
+2. Boost是一个社区，一个很牛逼的网站。致力与免费，源码开发，同僚复审的c++程序库开发。Boost 跟c++ 委员会有着很深的py关系。被称为c++新标准的试验场。
+3. Boost 提供很多tr1组件实现品，以及其他许多程序库。
+
