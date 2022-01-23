@@ -289,7 +289,7 @@
 
 ### 38.通过复合塑模出has-a 或“根据某物实现出”
 
-1. 复合的意义和public 继承完全不一样。
+1. 复合（class a 内有一个 class b 的对象）的意义和public 继承完全不一样。
 2. 在应用域，复合意味着has-a(有一个)。在实现域，复合意味着is-implemented-in-terms-of（根据某物实现出）。
    - 应用域：你所塑造世界中的某些东西（人，汽车，视频等等）
    - 实现域：用于实现对象的某些细节（缓冲区（buffer），互斥器（mutexes））
@@ -324,10 +324,140 @@
 2. virtual 继承会增加各种成本（大小，初始化）（比如说当创建一个派生类对象的时候最先调用的是virtual基类的构造函数，然后才是自身的），最好virtual 不带有任何数据。
 3. 多重继承某些时候确实有用，但尽量少用。
 
+# 模板与泛型编程
 
+### 41.了解隐式接口和编译期多态
 
+1. 记得区别编译期多态和运行期多态
+2. 对于classes 而言接口都是显式的，以函数签名为中心。多态则是通过virtual 发生于运行期。
+3. 对template参数而言，接口是隐式的，基于有效表达式。多态则是通过template具现化和函数重载解析发生于编译期。
+   1. 比如在模板里定义了w.size()。则代码w的类型有size() 这个接口
 
+### 42.了解typename的双重定义
 
+1. 在template的参数列表中使用typename 或者 class 没有任何区别。
 
+2. 区分从属名称和非从属名称
+   1. template内出现的名称如果相依于某个template 名称，这个就是从属名称。
 
-​                                                                                                         
+   2. 如果从属名称在class内呈嵌套状，我们称他为嵌套从属名称。如C::const_iterator。
+
+   3. 如果不依赖template参数的名称就叫非从属名称（non-dependent names）。比如int。
+
+3. 如果解析器在template中遭遇一个嵌套从属名称，它便会假设这个名称不是一个类型。比如会把上面的`C::const_iterator` 认为是一个变量。（要解决也很简单在这个名称之前放置关键字typename）`typename C::const_iterator`
+
+4. 不允许在base class list 内使用typename(我的理解是继承列表)
+
+   也不允许在成员初始值列表中使用typename。
+
+### 43.学习处理模板化基类内的名称
+
+1. 如果继承的是一个模板类，请假设派生类对基类的内容毫无所知。因为模板可能会有特例化，它可能会有一些一般基类没有的函数。当然你可以显示指定`this->`指明基类内的成员。
+
+## 模板相关的东西，从这里开始就不太懂了
+
+### 44.将与参数无关的代码抽离template
+
+1. templates 生成多个classes 和多个函数，所以任何template 代码都不应该与某个造成膨胀的template 参数产生相依关系。如
+
+   ```c++
+   template<typename T,std::size n>
+   //        类型参数↑    非类型参数↑
+   class Matrix{
+       cout << "这是一个" << n << "阶" << 矩阵 << endl;
+   }
+   ```
+
+   因此只要n发生改变，就会生成一个新的模板。
+
+2. 因非类型模板参数而造成的代码膨胀，往往可以消除，做法是以函数参数或class 成员变量替换 template 参数。
+
+3. 因类型参数而造成的代码膨胀，也可以降低，做法是让带有完全相同二进制表述的具现类共享实现码。
+
+### 45.运用成员函数模板接收所有兼容类型
+
+1. 请使用member function templates （成员函数模板）生成 ”可接受所有兼容类型“的函数。
+2. 如果你声明member template 用于”泛化copy构造“或泛化  assignment 操作" 你还是需要声明正常的copy 构造函数和copy assignment 操作符。
+
+### 46.需要类型转换时请为模板定义非成员函数
+
+1. class template 并不依赖template实参推导，但function template 可以。
+2. 当我们编写一个class template ,而它所提供之”与此template 相关的“函数支持”所有参数之隐式类型转换"时，请将那些函数定义为“class template”内部的friend 函数。（因为成员函数会隐式传递this指针，而this指针不支持隐式转换）
+
+### 47.请使用traits classes 表现类型信息
+
+1. 迭代器分类
+   1. Input 迭代器：只能向前移，一次一步，只能读取不能改写。例子：istream_iterators。
+   2. Ouput迭代器：只能前移，一次一部，只能改写，不能读取。例子：ostream_iterators。
+   3. forward迭代器：以上功能都能实现，而且可以多次读写。例子：slist。
+   4. Bidirectional（双向）迭代器：可以前移也可以后移。例子：set,multiset,map。
+   5. random access 迭代器：可以随机访问
+2.  traits（特征）
+   1. 作用：允许在编译期间取的某些类型信息
+   2. 定义：它是一种技术，也是一个c++程序员共同遵守的协议 
+      1. 确定若干你希望将来可以取得的类型相关信息，对迭代器而言，我们希望取得其分类
+      2. 为该信息选择一个名称
+      3. traits 能够施行于内置类型，因此类型traits 信息必须位于类型自身之外。标准技术是把它放入一个template及其一个或多个特化版本中。
+   3. 使用：
+      1. 建立一组函数重载或函数模板，彼此间的差异只有各自的traits参数。令每个函数实现码与其接受之traits信息相应和。（不用 if 判断或者 typeid 是因为他们在运行时才执行，而函数重载在编译时就进行）
+      2. 建立一个控制函数调用上面的函数重载或模板，并传递traits class所提供的信息。
+
+### 48.认识template元编程
+
+1. 它可以将运行期的工作转移到编译器来。因而得以实现早期错误检测和更高效的执行效率
+
+2. TMP通过递归来实现循环
+
+   1. TMP的“hello world"(计算阶乘) 通过”递归模板具现化“，实现循环(使用enum hacks。条例2)
+
+      ```c++
+      template<unsigned n>
+      struct Factorial{
+          enum {value = n * Factorial<n-1> : value}
+      }
+      template<>
+      struct Factorial<0>{
+          enum {value = 1};
+      }
+      ```
+
+3. TMP可以用来生成"基于政策选择组合"的客户定制代码，也可用来避免生成对某些特殊类型并不适合的代码。
+
+4. TMP可能不会成为主流，但对某些程序库开发人员，会成为他们的主要粮食。
+
+# 定制new 和 delete
+
+### 49.了解new-handler 的行为
+
+1. set_new_handler 允许客户指定一个函数，在内存分配无法获得满足时被调用。（new_handler 是一个函数指针哦）
+
+2. set_new_handler 会放回被替换前的那个new_handler
+
+3. 一个优先的new-handler 函数需要做到以下事情
+
+   1. 让更多内存被使用
+   2. 安装另一个new-handler（类似于状态转移）
+      1. 卸除new-handler（将指针设为null）
+   3. 抛出bad-alloc
+   4. 不放回（通常直接调用abort()或exit()直接退出程序）
+
+4. c++ 并不支持自定义类的new-handler。但是你可以自己定义啊。
+
+   ```c++
+   class Widget{
+   public:
+   	static std::new_handler set_new_handler(std::new_handler p) throw();
+       static void* operator new(std::size_t size) throw(std::bad_alloc);
+   private:
+       static std::new_handler currentHandler;
+   }
+   ```
+
+5. operator new 主要做以下事情：
+
+   1.   调用标准`set_new_handler`，告知Widget的错误处理函数。这会将Widget的 `new-handier` 安装为 `global new-handier`。
+   2. 调用global operator new,执行实际之内存分配。如果分配失败，`global operator new`会调用Widge的new-handier,因为那个函数才刚被安装为`global new-handiero`如果`global operator new`最终无法分配足够内存，会抛出一个 bad_alloc异常。在此情况下Widget的operator new必须恢复原本的`global new-handie`r,然后再传播该异常。为确保原本的new-handier总是能够被重新安 装回去，Widget将`global new-handier`视为资源并遵守条款13的忠告，运用资 源管理对象(resource-managing objects )防止资源泄漏
+   3. 如果`global operator new`能够分配足够一个Widget对象所用的内存，Widget 的operator new会返回一个指针，指向分配所得。Widget析构函数会管理 `global new-handier`,它会自动将 `Widget’s operator new` 被调用前的那个 global new-handier恢复回来.
+
+6. "mixin"风格的base class:允许derived classes 继承单一特定能力。
+
