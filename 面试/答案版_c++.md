@@ -337,7 +337,20 @@
 ### 字节序
 
 1. 小端字节序：低字节存放在内存低地址
+
 2. 大端字节序：高地址存放在内存低地址q
+
+3. ```c++
+   void check_cup(void) {
+       int a = 0x0102;    
+       char *p = (char *)&a; 
+       if (*p == 2)  puts("Big endian."); 
+       else if (*p == 1) 
+           puts("Little endian.");
+   }
+   ```
+
+   
 
 ### c++ 14 新特性
 
